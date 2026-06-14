@@ -1,0 +1,67 @@
+#!/bin/sh
+
+set -eu
+
+source_dir=${CTWM_SPLEEN_DIR:-/usr/share/fonts/spleen}
+cache_home=${XDG_CACHE_HOME:-"$HOME/.cache"}
+font_dir=$cache_home/ctwm/fonts/spleen
+
+[ -d "$source_dir" ] || exit 1
+command -v mkfontscale >/dev/null 2>&1 || exit 1
+command -v mkfontdir >/dev/null 2>&1 || exit 1
+command -v xset >/dev/null 2>&1 || exit 1
+
+mkdir -p "$font_dir"
+find "$font_dir" -maxdepth 1 -type f \
+    \( -name 'spleen-*' -o -name 'fonts.alias' -o -name 'fonts.dir' \
+    -o -name 'fonts.scale' \) -delete
+find "$font_dir" -maxdepth 1 -type l -delete
+
+found=false
+for font in "$source_dir"/spleen-*.pcf; do
+	[ -f "$font" ] || continue
+	cp "$font" "$font_dir/${font##*/}"
+	found=true
+done
+
+if ! $found; then
+	for font in "$source_dir"/spleen-*.otb; do
+		[ -f "$font" ] || continue
+		cp "$font" "$font_dir/${font##*/}"
+		found=true
+	done
+fi
+
+$found || exit 1
+
+if [ -f "$source_dir/fonts.alias" ]; then
+	cp "$source_dir/fonts.alias" "$font_dir/fonts.alias"
+fi
+
+mkfontscale "$font_dir"
+mkfontdir "$font_dir"
+
+if ! xset q |
+    awk -v wanted="$font_dir" '
+	/^Font Path:/ {
+		in_path = 1
+		next
+	}
+	in_path && /^[^[:space:]]/ {
+		exit
+	}
+	in_path {
+		count = split($0, paths, ",")
+		for (i = 1; i <= count; i++) {
+			gsub(/^[[:space:]]+|[[:space:]]+$/, "", paths[i])
+			if (paths[i] == wanted)
+				found = 1
+		}
+	}
+	END {
+		exit !found
+	}
+    '; then
+	xset +fp "$font_dir"
+fi
+xset fp rehash

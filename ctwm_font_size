@@ -1,0 +1,147 @@
+#!/bin/sh
+#	$NetBSD: ctwm_font_size,v 1.1 2020/10/12 11:07:24 nia Exp $
+#
+# Copyright (c) 2020 The NetBSD Foundation, Inc.
+# All rights reserved.
+#
+# This code is derived from software contributed to The NetBSD Foundation
+# by Nia Alarie.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
+# ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+# TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+# BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+#
+
+set -eu
+
+width=${CTWM_SCREEN_WIDTH:-}
+height=${CTWM_SCREEN_HEIGHT:-}
+dpi=${CTWM_SCREEN_DPI:-}
+
+is_number()
+{
+	case $1 in
+		''|*[!0-9.]*|.*|*.*.*) return 1 ;;
+		*) return 0 ;;
+	esac
+}
+
+is_integer()
+{
+	case $1 in
+		''|*[!0-9]*) return 1 ;;
+		*) return 0 ;;
+	esac
+}
+
+# Prefer the primary monitor. Using one monitor instead of the full X screen
+# avoids treating a side-by-side multi-monitor layout as one high-DPI display.
+xrandr_output=${CTWM_XRANDR_OUTPUT:-}
+if [ -z "$xrandr_output" ] &&
+    { ! is_integer "$width" || ! is_integer "$height" || ! is_number "$dpi"; } &&
+    command -v xrandr >/dev/null 2>&1; then
+	xrandr_output=$(xrandr --listactivemonitors 2>/dev/null || :)
+fi
+
+if [ -n "$xrandr_output" ] &&
+    { ! is_integer "$width" || ! is_integer "$height" || ! is_number "$dpi"; }; then
+	monitor=$(
+		printf '%s\n' "$xrandr_output" |
+		    awk '
+			NR == 1 { next }
+			{
+				geometry = $3
+				sub(/\+.*/, "", geometry)
+				split(geometry, dimensions, "x")
+				split(dimensions[1], horizontal, "/")
+				split(dimensions[2], vertical, "/")
+				if (horizontal[1] <= 0 || vertical[1] <= 0)
+					next
+
+				value = horizontal[1] " " vertical[1] " 0"
+				if (horizontal[2] > 0 && vertical[2] > 0) {
+					dpi = ((horizontal[1] / horizontal[2]) + (vertical[1] / vertical[2])) * 12.7
+					value = horizontal[1] " " vertical[1] " " dpi
+				}
+
+				if (!first)
+					first = value
+				if ($2 ~ /\*/) {
+					print value
+					found = 1
+					exit
+				}
+			}
+			END {
+				if (!found && first)
+					print first
+			}
+		    '
+	)
+
+	if [ -n "$monitor" ]; then
+		set -- $monitor
+		is_integer "$width" || width=$1
+		is_integer "$height" || height=$2
+		is_number "$dpi" || dpi=$3
+	fi
+fi
+
+is_integer "$width" || width=1024
+is_integer "$height" || height=768
+is_number "$dpi" || dpi=0
+
+# Select the smallest available Spleen size that is at least 3 mm high when
+# the server reports a non-default DPI. The largest size remains the fallback
+# for unusually dense displays.
+if awk -v dpi="$dpi" 'BEGIN { exit !(dpi > 100) }'; then
+	awk -v dpi="$dpi" '
+		BEGIN {
+			sizes[1] = 12
+			sizes[2] = 16
+			sizes[3] = 24
+			sizes[4] = 32
+			sizes[5] = 64
+			for (i = 1; i <= 5; i++) {
+				if ((sizes[i] * 25.4 / dpi) >= 3) {
+					print sizes[i]
+					exit
+				}
+			}
+			print 64
+		}
+	'
+	exit 0
+fi
+
+# If DPI is unavailable or looks like Xorg's default, preserve the NetBSD
+# screen-size heuristic. These limits allow at least a 2x2 grid of 80x24
+# terminals at each selected bitmap-font size.
+if [ "$width" -gt 6088 ] && [ "$height" -gt 3656 ]; then
+	printf '64\n'
+elif [ "$width" -gt 3048 ] && [ "$height" -gt 1832 ]; then
+	printf '32\n'
+elif [ "$width" -gt 2248 ] && [ "$height" -gt 1400 ]; then
+	printf '24\n'
+elif [ "$width" -gt 640 ] && [ "$height" -gt 480 ]; then
+	printf '16\n'
+else
+	printf '12\n'
+fi

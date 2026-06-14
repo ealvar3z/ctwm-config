@@ -1,0 +1,108 @@
+#!/bin/sh
+
+set -eu
+
+resolve_terminal()
+{
+	candidate=$1
+	[ -n "$candidate" ] || return 1
+
+	case ${candidate##*/} in
+		ctwm_terminal|xdg-terminal-exec)
+			return 1
+			;;
+	esac
+
+	case $candidate in
+		*/*)
+			[ -x "$candidate" ] || return 1
+			printf '%s\n' "$candidate"
+			;;
+		*)
+			command -v "$candidate" 2>/dev/null
+			;;
+	esac
+}
+
+find_terminal()
+{
+	# Explicit user preferences take precedence over session detection.
+	if [ -n "${CTWM_TERMINAL:-}" ]; then
+		resolve_terminal "$CTWM_TERMINAL" && return
+	fi
+	if [ -n "${TERMINAL:-}" ]; then
+		resolve_terminal "$TERMINAL" && return
+	fi
+	if [ -n "${CTWM_TERMINAL:-}${TERMINAL:-}" ]; then
+		resolve_terminal xterm
+		return
+	fi
+
+	# Reuse the emulator hosting the session when it leaves a reliable marker.
+	if [ -n "${KITTY_PID:-}${KITTY_WINDOW_ID:-}" ]; then
+		resolve_terminal kitty && return
+	fi
+	if [ -n "${ALACRITTY_SOCKET:-}${ALACRITTY_LOG:-}" ]; then
+		resolve_terminal alacritty && return
+	fi
+	if [ -n "${WEZTERM_PANE:-}" ]; then
+		resolve_terminal wezterm && return
+	fi
+	if [ -n "${KONSOLE_VERSION:-}" ]; then
+		resolve_terminal konsole && return
+	fi
+	if [ -n "${GNOME_TERMINAL_SERVICE:-}" ]; then
+		resolve_terminal gnome-terminal && return
+	fi
+	if [ -n "${TILIX_ID:-}" ]; then
+		resolve_terminal tilix && return
+	fi
+
+	case ${TERM_PROGRAM:-}:${TERM:-} in
+		WezTerm:*|*:wezterm*) resolve_terminal wezterm && return ;;
+		kitty:*|*:xterm-kitty*) resolve_terminal kitty && return ;;
+		Alacritty:*|*:alacritty*) resolve_terminal alacritty && return ;;
+		foot:*|*:foot*) resolve_terminal foot && return ;;
+		*:rxvt-unicode*) resolve_terminal urxvt && return ;;
+		*:rxvt*) resolve_terminal rxvt && return ;;
+	esac
+
+	resolve_terminal xterm
+}
+
+terminal=$(find_terminal) || {
+	printf '%s\n' 'ctwm_terminal: no terminal emulator found (install xterm or set CTWM_TERMINAL)' >&2
+	exit 127
+}
+
+if [ "${1:-}" = "--print" ]; then
+	printf '%s\n' "$terminal"
+	exit 0
+fi
+
+if [ "${1:-}" = "--" ]; then
+	shift
+fi
+
+if [ "$#" -eq 0 ]; then
+	exec "$terminal"
+fi
+
+# Terminal emulators disagree on how a child command is introduced.
+case ${terminal##*/} in
+	kitty|foot)
+		exec "$terminal" "$@"
+		;;
+	wezterm)
+		exec "$terminal" start -- "$@"
+		;;
+	gnome-terminal)
+		exec "$terminal" -- "$@"
+		;;
+	mate-terminal|xfce4-terminal)
+		exec "$terminal" -x "$@"
+		;;
+	*)
+		exec "$terminal" -e "$@"
+		;;
+esac

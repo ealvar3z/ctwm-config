@@ -1,0 +1,215 @@
+#!/bin/sh
+#	$NetBSD: ctwm_app_menu,v 1.8 2026/04/17 11:07:12 nia Exp $
+#
+# Copyright (c) 2020-2026 The NetBSD Foundation, Inc.
+# All rights reserved.
+#
+# This code is derived from software contributed to The NetBSD Foundation
+# by Nia Alarie.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
+# ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+# TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+# BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+#
+
+set -eu
+
+data_home=${XDG_DATA_HOME:-"$HOME/.local/share"}
+data_dirs=${XDG_DATA_DIRS:-/usr/local/share:/usr/share}
+current_desktop=${XDG_CURRENT_DESKTOP:-CTWM}
+libexec_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+
+set --
+[ ! -d "$data_home/applications" ] ||
+	set -- "$@" "$data_home/applications"
+
+old_ifs=$IFS
+IFS=:
+for data_dir in $data_dirs; do
+	[ -n "$data_dir" ] || continue
+	[ ! -d "$data_dir/applications" ] ||
+		set -- "$@" "$data_dir/applications"
+done
+IFS=$old_ifs
+
+records=$(mktemp "${TMPDIR:-/tmp}/ctwm-app-menu.XXXXXX")
+trap 'rm -f "$records"' EXIT HUP INT TERM
+
+awk_program='
+	function resetentry() {
+		file = FILENAME
+		type = name = exec = categories = onlyshow = notshow = ""
+		hidden = nodisplay = section = 0
+	}
+
+	function quote(s) {
+		gsub(/\\/, "\\\\", s)
+		gsub(/"/, "\\\"", s)
+		gsub(/\t/, "\\t", s)
+		return "\"" s "\""
+	}
+
+	function shellquote(s) {
+		gsub(/\\/, "\\\\", s)
+		gsub(/"/, "\\\"", s)
+		gsub(/\$/, "\\$", s)
+		gsub(/`/, "\\`", s)
+		return "\"" s "\""
+	}
+
+	function iskey(k, key) {
+		key = $0
+		sub(/ *=.*$/, "", key)
+		return key == k
+	}
+
+	function value(v) {
+		v = $0
+		sub(/^[^=]*= */, "", v)
+		return v
+	}
+
+	function hasitem(list, item) {
+		return index(";" list ";", ";" item ";") != 0
+	}
+
+	function desktopmatch(list, desktops, count, values, i) {
+		gsub(/:/, ";", desktops)
+		count = split(desktops, values, ";")
+		for (i = 1; i <= count; i++)
+			if (values[i] && hasitem(list, values[i]))
+				return 1
+		return 0
+	}
+
+	function printentry(command, i) {
+		if (type != "Application" || !name || !exec || hidden || nodisplay)
+			return
+		if (onlyshow && !desktopmatch(onlyshow, current_desktop))
+			return
+		if (notshow && desktopmatch(notshow, current_desktop))
+			return
+
+		menu = "Misc"
+		for (i = 0; i < catno; i++) {
+			if (hasitem(categories, catorder[i])) {
+				menu = catmenu[catorder[i]]
+				break
+			}
+		}
+
+		command = "PATH=" shellquote(libexec_dir) ":\"$PATH\" gio launch " shellquote(file) " &"
+		printf "%02d\t%s\t%s\t%s\n", menuorder[menu], quote(menu),
+		    quote(" " name), "!" quote(command)
+	}
+
+	BEGIN {
+		menuno = 0
+		menuorder["Accessories"] = menuno++
+		menuorder["Games"] = menuno++
+		menuorder["Graphics"] = menuno++
+		menuorder["Internet"] = menuno++
+		menuorder["Multimedia"] = menuno++
+		menuorder["Office"] = menuno++
+		menuorder["Programming"] = menuno++
+		menuorder["System"] = menuno++
+		menuorder["Misc"] = menuno++
+		for (menu in menuorder)
+			printf "%02d\t%s\n", menuorder[menu], quote(menu)
+
+		catmenu["Audio"] = "Multimedia"
+		catmenu["AudioVideo"] = "Multimedia"
+		catmenu["Video"] = "Multimedia"
+		catmenu["Development"] = "Programming"
+		catmenu["Game"] = "Games"
+		catmenu["Graphics"] = "Graphics"
+		catmenu["Network"] = "Internet"
+		catmenu["Office"] = "Office"
+		catmenu["Settings"] = "System"
+		catmenu["System"] = "System"
+		catmenu["Utility"] = "Accessories"
+
+		catno = 0
+		catorder[catno++] = "AudioVideo"
+		catorder[catno++] = "Audio"
+		catorder[catno++] = "Video"
+		catorder[catno++] = "Development"
+		catorder[catno++] = "Graphics"
+		catorder[catno++] = "Game"
+		catorder[catno++] = "Office"
+		catorder[catno++] = "Network"
+		catorder[catno++] = "Settings"
+		catorder[catno++] = "System"
+		catorder[catno++] = "Utility"
+
+		resetentry()
+	}
+
+				{ sub(/\r$/, "") }
+	FNR == 1 && NR > 1	{ printentry() }
+	END			{ printentry() }
+	FNR == 1		{ resetentry() }
+
+	/^\[/ {
+		section = ($0 == "[Desktop Entry]")
+		next
+	}
+	!section		{ next }
+
+	iskey("Type")		{ type = value() }
+	iskey("Name") && !name	{ name = value() }
+	iskey("Exec") && !exec	{ exec = value() }
+	iskey("Categories")	{ categories = value() }
+	iskey("OnlyShowIn")	{ onlyshow = value() }
+	iskey("NotShowIn")	{ notshow = value() }
+	/^Hidden *= *[Tt][Rr][Uu][Ee]$/	{ hidden = 1 }
+	/^NoDisplay *= *[Tt][Rr][Uu][Ee]$/	{ nodisplay = 1 }
+'
+
+if [ "$#" -gt 0 ]; then
+	find "$@" -type f -name '*.desktop' -exec \
+	    awk -v current_desktop="$current_desktop" \
+	    -v libexec_dir="$libexec_dir" "$awk_program" '{}' + \
+	    >"$records"
+else
+	awk -v current_desktop="$current_desktop" \
+	    -v libexec_dir="$libexec_dir" "$awk_program" /dev/null \
+	    >"$records"
+fi
+
+sort -u "$records" |
+    awk -F '\t' '
+	function startmenu(menu) {
+		printf "menu %s\n", menu
+		printf "{\n"
+		printf "\t%s\tf.title\n", menu
+		curmenu = menu
+	}
+
+	function endmenu() {
+		if (curmenu)
+			printf "}\n"
+	}
+
+	# Inputs: 1=order 2=menu [3=name 4=command], strings pre-quoted.
+	$2 != curmenu	{ endmenu(); startmenu($2) }
+	NF == 4		{ printf "\t%s %s\n", $3, $4 }
+	END		{ endmenu() }
+    '
