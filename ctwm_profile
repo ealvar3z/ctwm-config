@@ -1,0 +1,145 @@
+#!/bin/sh
+
+set -eu
+
+home=${HOME:-$(cd && pwd)}
+config_home=${XDG_CONFIG_HOME:-"$home/.config"}
+profile=${CTWM_PROFILE:-"$config_home/ctwm/profile"}
+
+env_theme_set=${CTWM_THEME+x}
+env_theme_value=${CTWM_THEME:-}
+env_platform_set=${CTWM_PLATFORM+x}
+env_platform_value=${CTWM_PLATFORM:-}
+
+if [ -r "$profile" ]; then
+	. "$profile"
+fi
+
+if [ -n "$env_theme_set" ]; then
+	CTWM_THEME=$env_theme_value
+fi
+if [ -n "$env_platform_set" ]; then
+	CTWM_PLATFORM=$env_platform_value
+fi
+
+lower()
+{
+	printf '%s\n' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+normalize_theme()
+{
+	case $(lower "${1:-}") in
+		acme) printf 'acme\n' ;;
+		netbsd|'') printf 'netbsd\n' ;;
+		*) printf 'netbsd\n' ;;
+	esac
+}
+
+detect_linux_platform()
+{
+	id=
+	id_like=
+
+	if [ -r /etc/os-release ]; then
+		# Standard OS metadata; it is expected to contain shell assignments.
+		. /etc/os-release
+		id=${ID:-}
+		id_like=${ID_LIKE:-}
+	fi
+
+	case " $(lower "$id") $(lower "$id_like") " in
+		*" arch "*) printf 'arch\n' ;;
+		*" debian "*|*" ubuntu "*) printf 'debian\n' ;;
+		*) printf 'linux\n' ;;
+	esac
+}
+
+detect_platform()
+{
+	case $(uname -s 2>/dev/null || printf unknown) in
+		NetBSD) printf 'netbsd\n' ;;
+		FreeBSD) printf 'freebsd\n' ;;
+		OpenBSD) printf 'openbsd\n' ;;
+		Linux) detect_linux_platform ;;
+		*) printf 'linux\n' ;;
+	esac
+}
+
+normalize_platform()
+{
+	case $(lower "${1:-}") in
+		netbsd|net) printf 'netbsd\n' ;;
+		freebsd|free) printf 'freebsd\n' ;;
+		openbsd|open) printf 'openbsd\n' ;;
+		arch|archlinux) printf 'arch\n' ;;
+		debian|ubuntu|linuxmint|pop) printf 'debian\n' ;;
+		linux) printf 'linux\n' ;;
+		'') detect_platform ;;
+		*) detect_platform ;;
+	esac
+}
+
+platform=${CTWM_PLATFORM:-}
+theme=${CTWM_THEME:-}
+
+platform=$(normalize_platform "$platform")
+theme=$(normalize_theme "$theme")
+
+case $platform in
+	netbsd) platform_title='NetBSD' ;;
+	freebsd) platform_title='FreeBSD' ;;
+	openbsd) platform_title='OpenBSD' ;;
+	arch) platform_title='Arch Linux' ;;
+	debian) platform_title='Debian' ;;
+	*) platform_title='Linux' ;;
+esac
+
+case ${1:-} in
+	--platform)
+		printf '%s\n' "$platform"
+		exit 0
+		;;
+	--theme)
+		printf '%s\n' "$theme"
+		exit 0
+		;;
+	--print)
+		printf 'CTWM_PLATFORM=%s\n' "$platform"
+		printf 'CTWM_THEME=%s\n' "$theme"
+		exit 0
+		;;
+	''|--m4)
+		;;
+	*)
+		printf 'usage: %s [--platform|--theme|--print|--m4]\n' "$0" >&2
+		exit 2
+		;;
+esac
+
+printf 'define(ctwmplatform, %s)\n' "$platform"
+printf 'define(ctwmtheme, %s)\n' "$theme"
+printf 'define(ctwmplatformtitle, %s)\n' "$platform_title"
+
+if command -v dmenu_run >/dev/null 2>&1; then
+	printf 'define(hasdmenu, yes)\n'
+fi
+
+if command -v 9 >/dev/null 2>&1; then
+	printf 'define(hasplan9, yes)\n'
+	printf 'define(has9, yes)\n'
+	printf 'define(plan9acme, 9 acme)\n'
+	if command -v rc >/dev/null 2>&1; then
+		printf 'define(hasplan9rc, yes)\n'
+		printf 'define(plan9rc, rc)\n'
+	elif [ -x /usr/local/plan9/bin/rc ]; then
+		printf 'define(hasplan9rc, yes)\n'
+		printf 'define(plan9rc, /usr/local/plan9/bin/rc)\n'
+	elif [ -x /usr/pkg/plan9/bin/rc ]; then
+		printf 'define(hasplan9rc, yes)\n'
+		printf 'define(plan9rc, /usr/pkg/plan9/bin/rc)\n'
+	fi
+elif command -v acme >/dev/null 2>&1; then
+	printf 'define(hasplan9, yes)\n'
+	printf 'define(plan9acme, acme)\n'
+fi

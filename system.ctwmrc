@@ -1,6 +1,6 @@
 #
 # Based on NetBSD's system.ctwmrc,v 1.20 (2024-04-24).
-# Adapted with Arch-compatible helper scripts.
+# Adapted with portable helper scripts for BSD and Linux systems.
 #
 # ctwmrc by nia
 #
@@ -32,6 +32,13 @@ UseThreeDTitles
 esyscmd(`default_home=$(cd && pwd)
 libexec="${CTWM_LIBEXEC:-$default_home/.local/libexec/ctwm}"
 printf "define(ctwmlibexec, %s)\n" "$libexec"
+')
+
+esyscmd(sh "ctwmlibexec/ctwm_profile")
+
+esyscmd(`
+default_home=$(cd && pwd)
+libexec="${CTWM_LIBEXEC:-$default_home/.local/libexec/ctwm}"
 if sh "$libexec/ctwm_font_path" >/dev/null 2>&1; then
 	printf "define(hasspleen, yes)\n"
 fi
@@ -51,7 +58,7 @@ define(font24, `"-*-spleen-*-*-*-*-24-*-*-*-*-*-*-*"')
 define(font32, `"-*-spleen-*-*-*-*-32-*-*-*-*-*-*-*"')
 define(font64, `"-*-spleen-*-*-*-*-64-*-*-*-*-*-*-*"')
 ', `
-# These aliases are supplied by xorg-fonts-misc, an Arch ctwm dependency.
+# These aliases are supplied by common X11 bitmap font packages.
 define(font8,  `"5x8"')
 define(font12, `"6x12"')
 define(font16, `"8x16"')
@@ -204,7 +211,11 @@ IconManagerShadowDepth    1
 IconifyByUnmapping
 
 ReallyMoveInWorkspaceManager
+ifelse(ctwmtheme, `acme', `
+MapWindowCurrentWorkSpace {  "#000000" "#8888CC" }
+', `
 MapWindowCurrentWorkSpace {  "black" "firebrick" }
+')
 DontToggleWorkSpaceManagerState
 DontWarpCursorInWMap
 NoShowOccupyAll	
@@ -213,7 +224,16 @@ StartInMapState
 WMgrHorizButtonIndent     0
 WMgrVertButtonIndent      0
 
-WorkSpaces 
+ifelse(ctwmtheme, `acme', `
+WorkSpaces
+{
+    "term"    { "#EAFFFF" "#000000" "#FFFFEA" "#000000" }
+    "edit"    { "#EAFFFF" "#000000" "#FFFFEA" "#000000" }
+    "web"     { "#EAFFFF" "#000000" "#FFFFEA" "#000000" }
+    "misc"    { "#EAFFFF" "#000000" "#FFFFEA" "#000000" }
+}
+', `
+WorkSpaces
 {
     "1"    { "lavender" "black" "darkslateblue" "white" }
     "2"    { "lavender" "black" "darkslateblue" "white" }
@@ -221,6 +241,7 @@ WorkSpaces
     "4"    { "lavender" "black" "darkslateblue" "white" }
     "5"    { "lavender" "black" "darkslateblue" "white" }
 }
+')
 
 Cursors
 {
@@ -237,6 +258,38 @@ Cursors
   Destroy  "pirate"
 }
 
+ifelse(ctwmtheme, `acme', `
+Color
+{
+  BorderColor           "#99994C"
+
+  BorderTileBackground  "#EEEE9E"
+  BorderTileForeground  "#99994C"
+
+  DefaultBackground     "#FFFFEA"
+  DefaultForeground     "#000000"
+
+  TitleBackground       "#EAFFFF"
+  TitleForeground       "#000000"
+
+  MenuBackground        "#EAFFFF"
+  MenuForeground        "#000000"
+  MenuTitleBackground   "#9EEEEE"
+  MenuTitleForeground   "#000000"
+  MenuShadowColor       "#8888CC"
+
+  IconBackground        "#FFFFEA"
+  IconForeground        "#000000"
+  IconBorderColor       "#99994C"
+
+  IconManagerBackground "#EAFFFF"
+  IconManagerForeground "#000000"
+  IconManagerHighlight  "#8888CC"
+
+  MapWindowBackground   "#FFFFEA"
+  MapWindowForeground   "#000000"
+}
+', `
 Color
 {
   BorderColor           "firebrick"
@@ -267,6 +320,7 @@ Color
   MapWindowBackground   "lavender"
   MapWindowForeground   "black"	
 }
+')
 
 Monochrome
 {
@@ -302,7 +356,9 @@ menu "appmenu"
     " System"			f.menu "System"
     " Misc"			f.menu "Misc"
     ""				f.separator
+ifdef(`hasdmenu', `
     " Run with dmenu"		!"dmenu_run &"
+')
 }
 
 menu "deskutils"
@@ -325,23 +381,41 @@ menu "termutils"
     "Terminal utilities"	f.title
     ""				f.separator
     " VIsual Editor"		!"\"ctwmlibexec/ctwm_terminal\" vi &"
-    " Audio mixer"		!"\"ctwmlibexec/ctwm_terminal\" alsamixer &"
+    " Audio mixer"		!"\"ctwmlibexec/ctwm_terminal\" \"ctwmlibexec/ctwm_monitor\" audio &"
     ""				f.separator
     " Top processes"		!"\"ctwmlibexec/ctwm_terminal\" top &"
-    " I/O stats"		!"\"ctwmlibexec/ctwm_terminal\" watch -n 2 iostat &"
-    " Network stats"		!"\"ctwmlibexec/ctwm_terminal\" watch -n 2 ip -s link &"
-    " Disk usage"		!"\"ctwmlibexec/ctwm_terminal\" watch -n 2 df -h &"
+    " I/O stats"		!"\"ctwmlibexec/ctwm_terminal\" \"ctwmlibexec/ctwm_monitor\" io &"
+    " Network stats"		!"\"ctwmlibexec/ctwm_terminal\" \"ctwmlibexec/ctwm_monitor\" network &"
+    " Disk usage"		!"\"ctwmlibexec/ctwm_terminal\" \"ctwmlibexec/ctwm_monitor\" disk &"
 }
 
-menu "Arch"
+ifdef(`hasplan9', `
+menu "plan9utils"
 {
-    "Arch Linux"		f.title
+    "Plan 9"			f.title
+    " Acme"			!"plan9acme &"
+ifdef(`has9', `
+    " Sam"			!"\"ctwmlibexec/ctwm_terminal\" 9 sam &"
+    " Plumber"			!"9 plumber &"
+')
+ifdef(`hasplan9rc', `
+    " rc shell"		!"\"ctwmlibexec/ctwm_terminal\" plan9rc &"
+')
+}
+')
+
+menu "mainmenu"
+{
+    "CTWM (ctwmplatformtitle)"	f.title
     ""				f.separator
     " Terminal"			!"\"ctwmlibexec/ctwm_terminal\" &"
     ""				f.separator
     " Applications"		f.menu "appmenu"
     " Desktop utilities"	f.menu "deskutils"
     " Terminal utilities"	f.menu "termutils"
+ifdef(`hasplan9', `
+    " Plan 9"			f.menu "plan9utils"
+')
     ""				f.separator
     " Restart CTWM"		f.twmrc
     " Quit"			f.quit
@@ -426,9 +500,9 @@ Button1 =	: icon | iconmgr	: f.iconify
 Button2 =	: icon			: f.move
 Button3 =	: icon | iconmgr	: f.raiselower
 
-Button1 =	: root		: f.menu "Arch"
+Button1 =	: root		: f.menu "mainmenu"
 Button2 =	: root		: f.menu "TwmAllWindows"
-Button3 =	: root		: f.menu "Arch"
+Button3 =	: root		: f.menu "mainmenu"
 
 #
 # Mod1 is the "Alt/Meta" key.
@@ -450,6 +524,17 @@ Button3 = mod4	: window 	: f.resize
 "Left"   = mod1 | control : all : f.prevworkspace
 "Right"  = mod1 | control : all : f.nextworkspace
 
+ifelse(ctwmtheme, `acme', `
+"1"      = mod1 | control : all : f.gotoworkspace "term"
+"2"      = mod1 | control : all : f.gotoworkspace "edit"
+"3"      = mod1 | control : all : f.gotoworkspace "web"
+"4"      = mod1 | control : all : f.gotoworkspace "misc"
+
+"1"      = mod4 : all : f.gotoworkspace "term"
+"2"      = mod4 : all : f.gotoworkspace "edit"
+"3"      = mod4 : all : f.gotoworkspace "web"
+"4"      = mod4 : all : f.gotoworkspace "misc"
+', `
 "1"      = mod1 | control : all : f.gotoworkspace "1"
 "2"      = mod1 | control : all : f.gotoworkspace "2"
 "3"      = mod1 | control : all : f.gotoworkspace "3"
@@ -461,10 +546,11 @@ Button3 = mod4	: window 	: f.resize
 "3"      = mod4 : all : f.gotoworkspace "3"
 "4"      = mod4 : all : f.gotoworkspace "4"
 "5"      = mod4 : all : f.gotoworkspace "5"
+')
 
-"XF86AudioRaiseVolume" = : all : !"wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"
-"XF86AudioLowerVolume" = : all : !"wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
-"XF86AudioMute"        = : all : !"wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+"XF86AudioRaiseVolume" = : all : !"\"ctwmlibexec/ctwm_volume\" up &"
+"XF86AudioLowerVolume" = : all : !"\"ctwmlibexec/ctwm_volume\" down &"
+"XF86AudioMute"        = : all : !"\"ctwmlibexec/ctwm_volume\" mute &"
 
 #
 # "Windows" style keyboard shortcuts
@@ -494,8 +580,20 @@ Button3 = mod4	: window 	: f.resize
 
 "slash"  = mod1 | c : all : f.menu "TwmAllWindows"
 "slash"  = mod4 : all     : f.menu "TwmAllWindows"
-"p"      = mod1 | c : all : f.menu "Arch"
-"p"      = mod4 : all     : f.menu "Arch"
+"p"      = mod1 | c : all : f.menu "mainmenu"
+"p"      = mod4 : all     : f.menu "mainmenu"
+
+ifelse(ctwmtheme, `acme', `
+"m"      = mod1 : all : f.menu "mainmenu"
+"w"      = mod1 : all : f.menu "titleops"
+"n"      = mod1 : all : f.nextworkspace
+"p"      = mod1 : all : f.prevworkspace
+"i"      = mod1 : window : f.iconify
+"f"      = mod1 : window : f.fullzoom
+ifdef(`hasplan9', `
+"a"      = mod1 : all : !"plan9acme &"
+')
+')
 
 # vi-style directions
 "j"      = mod1 | control : window : f.jumpdown "10"

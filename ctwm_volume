@@ -1,0 +1,78 @@
+#!/bin/sh
+
+set -u
+
+action=${1:-}
+
+case $action in
+	up|down|mute) ;;
+	*)
+		printf 'usage: %s up|down|mute\n' "$0" >&2
+		exit 2
+		;;
+esac
+
+try()
+{
+	"$@" >/dev/null 2>&1
+}
+
+if command -v wpctl >/dev/null 2>&1; then
+	case $action in
+		up) try wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+ && exit 0 ;;
+		down) try wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- && exit 0 ;;
+		mute) try wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle && exit 0 ;;
+	esac
+fi
+
+if command -v pactl >/dev/null 2>&1; then
+	case $action in
+		up) try pactl set-sink-volume @DEFAULT_SINK@ +5% && exit 0 ;;
+		down) try pactl set-sink-volume @DEFAULT_SINK@ -5% && exit 0 ;;
+		mute) try pactl set-sink-mute @DEFAULT_SINK@ toggle && exit 0 ;;
+	esac
+fi
+
+if command -v sndioctl >/dev/null 2>&1; then
+	case $action in
+		up) try sndioctl output.level=+0.05 && exit 0 ;;
+		down) try sndioctl output.level=-0.05 && exit 0 ;;
+		mute) try sndioctl output.mute=! && exit 0 ;;
+	esac
+fi
+
+if command -v mixerctl >/dev/null 2>&1; then
+	case $action in
+		up)
+			try mixerctl -w outputs.master+=5 && exit 0
+			try mixerctl -w outputs.dac+=5 && exit 0
+			;;
+		down)
+			try mixerctl -w outputs.master-=5 && exit 0
+			try mixerctl -w outputs.dac-=5 && exit 0
+			;;
+		mute)
+			try mixerctl -w outputs.master.mute=toggle && exit 0
+			try mixerctl -w outputs.dac.mute=toggle && exit 0
+			;;
+	esac
+fi
+
+if command -v mixer >/dev/null 2>&1; then
+	case $action in
+		up)
+			try mixer vol +5 && exit 0
+			try mixer pcm +5 && exit 0
+			;;
+		down)
+			try mixer vol -5 && exit 0
+			try mixer pcm -5 && exit 0
+			;;
+		mute)
+			try mixer vol.mute=toggle && exit 0
+			try mixer pcm.mute=toggle && exit 0
+			;;
+	esac
+fi
+
+exit 0

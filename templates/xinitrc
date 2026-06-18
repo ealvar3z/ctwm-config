@@ -1,0 +1,52 @@
+#!/bin/sh
+
+home=${HOME:-$(cd && pwd)}
+config_home=${XDG_CONFIG_HOME:-"$home/.config"}
+profile=${CTWM_PROFILE:-"$config_home/ctwm/profile"}
+
+export PATH="$home/.local/bin:$home/bin:/usr/local/bin:/usr/local/sbin:/usr/pkg/bin:/usr/pkg/sbin:$PATH"
+
+env_theme_set=${CTWM_THEME+x}
+env_theme_value=${CTWM_THEME:-}
+env_platform_set=${CTWM_PLATFORM+x}
+env_platform_value=${CTWM_PLATFORM:-}
+
+if [ -r "$profile" ]; then
+	. "$profile"
+fi
+
+if [ -n "$env_theme_set" ]; then
+	CTWM_THEME=$env_theme_value
+fi
+if [ -n "$env_platform_set" ]; then
+	CTWM_PLATFORM=$env_platform_value
+fi
+
+theme=${CTWM_THEME:-netbsd}
+
+if [ -f "$home/.Xresources" ] && command -v xrdb >/dev/null 2>&1; then
+	xrdb -merge "$home/.Xresources"
+fi
+
+if command -v xset >/dev/null 2>&1; then
+	xset b off
+fi
+
+if [ "$theme" = acme ]; then
+	if command -v xsetroot >/dev/null 2>&1; then
+		xsetroot -solid '#FFFFEA' -cursor_name left_ptr
+	fi
+	if command -v 9 >/dev/null 2>&1; then
+		if ! pgrep -u "${USER:-$(id -un)}" -f plumber >/dev/null 2>&1; then
+			9 plumber >"${TMPDIR:-/tmp}/plumber.${USER:-user}.log" 2>&1 &
+		fi
+	fi
+	if command -v xterm >/dev/null 2>&1; then
+		xterm -name acme-term -title '+Errors' -geometry 100x28+20+70 &
+	fi
+	if command -v xclock >/dev/null 2>&1; then
+		xclock -analog -geometry 120x120-10+10 &
+	fi
+fi
+
+exec ctwm --nowelcome

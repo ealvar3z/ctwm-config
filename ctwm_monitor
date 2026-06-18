@@ -1,0 +1,83 @@
+#!/bin/sh
+
+set -u
+
+interval=${CTWM_MONITOR_INTERVAL:-2}
+
+clear_screen()
+{
+	if command -v clear >/dev/null 2>&1; then
+		clear
+	else
+		printf '\033c'
+	fi
+}
+
+loop_command()
+{
+	title=$1
+	shift
+
+	while :; do
+		clear_screen
+		date
+		printf '\n%s\n\n' "$title"
+		"$@"
+		sleep "$interval" 2>/dev/null || sleep 2
+	done
+}
+
+missing()
+{
+	printf '%s\n' "$1"
+	printf 'Press Ctrl-C to close this terminal.\n'
+	while :; do
+		sleep 3600
+	done
+}
+
+case ${1:-} in
+	top)
+		if command -v top >/dev/null 2>&1; then
+			exec top
+		fi
+		missing 'top was not found.'
+		;;
+	io)
+		if command -v iostat >/dev/null 2>&1; then
+			loop_command 'I/O statistics' iostat
+		fi
+		missing 'iostat was not found.'
+		;;
+	network)
+		if command -v ip >/dev/null 2>&1; then
+			loop_command 'Network statistics' ip -s link
+		elif command -v netstat >/dev/null 2>&1; then
+			loop_command 'Network statistics' netstat -ibn
+		elif command -v ifconfig >/dev/null 2>&1; then
+			loop_command 'Network interfaces' ifconfig -a
+		fi
+		missing 'No network statistics command was found.'
+		;;
+	disk)
+		if df -h . >/dev/null 2>&1; then
+			loop_command 'Disk usage' df -h
+		else
+			loop_command 'Disk usage' df -k
+		fi
+		;;
+	audio)
+		if command -v alsamixer >/dev/null 2>&1; then
+			exec alsamixer
+		elif command -v mixer >/dev/null 2>&1; then
+			exec mixer
+		elif command -v sndioctl >/dev/null 2>&1; then
+			loop_command 'Audio controls' sndioctl
+		fi
+		missing 'No terminal audio mixer was found.'
+		;;
+	*)
+		printf 'usage: %s top|io|network|disk|audio\n' "$0" >&2
+		exit 2
+		;;
+esac

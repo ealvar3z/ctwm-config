@@ -24,6 +24,14 @@ resolve_terminal()
 	esac
 }
 
+fallback_terminal()
+{
+	for candidate in x-terminal-emulator xterm uxterm; do
+		resolve_terminal "$candidate" && return
+	done
+	return 1
+}
+
 find_terminal()
 {
 	# Explicit user preferences take precedence over session detection.
@@ -34,7 +42,7 @@ find_terminal()
 		resolve_terminal "$TERMINAL" && return
 	fi
 	if [ -n "${CTWM_TERMINAL:-}${TERMINAL:-}" ]; then
-		resolve_terminal xterm
+		fallback_terminal
 		return
 	fi
 
@@ -67,7 +75,7 @@ find_terminal()
 		*:rxvt*) resolve_terminal rxvt && return ;;
 	esac
 
-	resolve_terminal xterm
+	fallback_terminal
 }
 
 terminal=$(find_terminal) || {

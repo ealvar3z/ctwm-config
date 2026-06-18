@@ -1,0 +1,9 @@
+! Minimal X resources for the NetBSD-style CTWM theme.
+
+XTerm*termName: xterm-256color
+XTerm*locale: true
+XTerm*utf8: 1
+XTerm*saveLines: 10000
+XTerm*selectToClipboard: true
+XTerm*metaSendsEscape: true
+XTerm*bellIsUrgent: true

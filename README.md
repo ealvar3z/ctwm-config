@@ -1,92 +1,119 @@
-# NetBSD ctwm configuration for Arch Linux
+# Portable CTWM Configuration
 
-This is NetBSD's default ctwm configuration adapted for Arch Linux. It keeps
-the window decorations, colors, workspaces, DPI-aware font sizing, generated
-application menus, mouse actions, and keyboard bindings.
+This is a portable CTWM setup modeled after NetBSD's default `system.ctwmrc`.
+It supports NetBSD, FreeBSD, OpenBSD, Arch Linux, Debian/Ubuntu-style systems,
+and a generic Linux fallback from one shared config and helper set.
+
+The default theme keeps the NetBSD-like workspaces, colors, menus, font sizing,
+mouse actions, and keyboard bindings. The `acme` theme adds the Plan 9
+Acme-inspired palette from the old FreeBSD setup and can be used on any
+supported platform.
 
 ## Install
 
-Install the required packages:
-
-```sh
-sudo pacman -S ctwm glib2 xterm
-```
-
-Install the configuration as `~/.ctwmrc`:
+Install the user config and helpers:
 
 ```sh
 make install-user
 ```
 
-The install target writes the helper scripts to `~/.local/libexec/ctwm` and
-creates a timestamped backup when `~/.ctwmrc` already exists and differs from
-this configuration.
+This installs `~/.ctwmrc` and helper scripts under `~/.local/libexec/ctwm`.
+Existing files are backed up with a timestamp when they differ.
 
-From a display manager, select the **ctwm** session installed by the Arch
-package. To start ctwm with `startx`, put this in `~/.xinitrc`:
+Persist optional defaults:
 
 ```sh
+make install-profile THEME=acme PLATFORM=freebsd
+```
+
+`THEME` may be `netbsd` or `acme`. `PLATFORM` may be `netbsd`, `freebsd`,
+`openbsd`, `arch`, `debian`, or `linux`; omit it to auto-detect at CTWM
+startup. Runtime environment variables override the profile file:
+
+```sh
+export CTWM_THEME=acme
+export CTWM_PLATFORM=openbsd
 exec ctwm
 ```
 
-## Optional menu commands
-
-The base desktop works with only `ctwm` and `xterm`. Install these packages to
-enable all menu entries and multimedia keys:
+For `startx`, install the optional xinit template:
 
 ```sh
-sudo pacman -S \
-  alsa-utils dmenu mesa-utils sysstat vim wireplumber xcompmgr \
-  xorg-xcalc xorg-xedit xorg-xeyes xorg-xkill xorg-xmag
+make install-xinit
 ```
 
-`wireplumber` supplies `wpctl`, which controls PipeWire volume. The application
-menu is generated from the user and system XDG application directories.
-`glib2` supplies `gio`, which launches desktop files without interpreting their
-`Exec=` values as shell commands. `dmenu_run` remains available as an optional
-fallback launcher.
-
-## Spleen fonts
-
-The configuration uses Spleen when the `spleen-font` AUR package is installed.
-Install the X11 font indexing utilities as well:
+For theme Xresources, install one of the templates:
 
 ```sh
-sudo pacman -S xorg-mkfontscale xorg-xset
-# Install spleen-font from the AUR with your preferred AUR workflow.
+make install-xresources THEME=acme
 ```
 
-At startup, `ctwm_font_path` builds an indexed font directory under
-`~/.cache/ctwm/fonts/spleen` and adds it to the current X server font path.
-When Spleen or the indexing tools are unavailable, the configuration falls
-back to bitmap fonts supplied by `xorg-fonts-misc`.
+From a display manager, select the CTWM session supplied by your OS package.
+For a minimal manual `~/.xinitrc`, `exec ctwm` is still enough.
 
-`ctwm_font_size` uses the primary monitor reported by `xrandr`, avoiding the
-incorrect scaling that can result from treating a multi-monitor desktop as one
-large display.
+## Packages
 
-## Terminal selection
+The base desktop needs CTWM, `xterm`, and GLib's `gio` command for safe XDG
+desktop-file launching. Package names can vary slightly by release, but these
+are the intended package sets:
+
+| System | Required | Useful optional packages |
+| --- | --- | --- |
+| Arch | `sudo pacman -S ctwm glib2 xterm` | `dmenu mesa-utils sysstat vim wireplumber xcompmgr xorg-xcalc xorg-xedit xorg-xeyes xorg-xkill xorg-xmag xorg-xrandr xorg-xset xorg-xsetroot` |
+| Debian/Ubuntu | `sudo apt install ctwm libglib2.0-bin xterm` | `dmenu mesa-utils sysstat vim wireplumber pulseaudio-utils x11-apps xcompmgr x11-xserver-utils` |
+| FreeBSD | `sudo pkg install xorg ctwm xterm glib` | `dmenu mesa-demos sysstat vim xcompmgr xcalc xedit xeyes xkill xmag xrandr xsetroot xclock plan9port` |
+| NetBSD/pkgsrc | `sudo pkgin install ctwm glib2 xterm` | `dmenu mesa-demos sysstat vim xcompmgr xcalc xedit xeyes xkill xmag plan9port` |
+| OpenBSD | `doas pkg_add ctwm glib2 xterm` | `dmenu mesa-demos vim xcompmgr plan9port` |
+
+Optional menu entries simply fail to launch if their command is not installed.
+The generated XDG application menu is available when `gio` is installed.
+Volume keys use the first available backend among `wpctl`, `pactl`, `sndioctl`,
+`mixerctl`, and `mixer`.
+
+## Themes
+
+`netbsd` is the default. It uses numbered workspaces and the NetBSD-derived
+lavender/firebrick palette.
+
+`acme` uses:
+
+- body background `#FFFFEA`
+- body selection `#EEEE9E`
+- body border/accent `#99994C`
+- tag/title background `#EAFFFF`
+- tag selection `#9EEEEE`
+- tag/title border `#8888CC`
+- text `#000000`
+
+When Plan 9 tools are installed, CTWM detects them at startup and adds Acme,
+Sam, plumber, and rc shell menu entries where the commands are available.
+
+## Fonts
+
+At startup, `ctwm_font_size` selects a bitmap font size from the primary
+monitor reported by `xrandr`, avoiding multi-monitor scaling mistakes.
+
+`ctwm_font_path` uses Spleen when installed. It searches common Linux, FreeBSD,
+NetBSD/pkgsrc, and OpenBSD font roots, then builds an indexed font cache under
+`~/.cache/ctwm/fonts/spleen`. Set `CTWM_SPLEEN_DIR` to force a specific source
+directory. When Spleen or X11 font indexing tools are unavailable, the config
+falls back to standard X bitmap font aliases.
+
+## Terminal Selection
 
 All terminal shortcuts and `Terminal=true` desktop entries use
 `ctwm_terminal`. It selects a terminal in this order:
 
 1. `CTWM_TERMINAL`
 2. `TERMINAL`
-3. The active terminal identified by environment markers from kitty,
+3. the active terminal identified by environment markers from kitty,
    Alacritty, WezTerm, foot, urxvt, Konsole, GNOME Terminal, or Tilix
-4. `xterm`
+4. `x-terminal-emulator`, `xterm`, or `uxterm`
 
-Set the preference to an executable name or path before starting ctwm:
+Preference variables must contain an executable name or path, without extra
+options. The helper handles the different command-execution conventions used
+by common terminal emulators.
 
-```sh
-export TERMINAL=alacritty
-exec ctwm
-```
-
-Use `CTWM_TERMINAL` when the preference should apply only to this
-configuration. The helper handles the different command-execution conventions
-used by xterm, urxvt, kitty, Alacritty, and other common emulators. Preference
-variables must contain an executable name or path, without additional options.
-
-Run `make check` after editing to check the helper scripts, font-size
-heuristics, m4 preprocessing, and ctwm syntax when ctwm is installed.
+Run `make check` after editing to check helper syntax, font-size heuristics,
+profile precedence, m4 preprocessing across every supported platform/theme
+pair, and CTWM syntax when `ctwm` is installed.

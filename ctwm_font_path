@@ -2,11 +2,44 @@
 
 set -eu
 
-source_dir=${CTWM_SPLEEN_DIR:-/usr/share/fonts/spleen}
 cache_home=${XDG_CACHE_HOME:-"$HOME/.cache"}
 font_dir=$cache_home/ctwm/fonts/spleen
 
-[ -d "$source_dir" ] || exit 1
+has_spleen_fonts()
+{
+	for font in "$1"/spleen-*.pcf "$1"/spleen-*.pcf.gz "$1"/spleen-*.otb; do
+		[ -f "$font" ] && return 0
+	done
+	return 1
+}
+
+find_source_dir()
+{
+	if [ -n "${CTWM_SPLEEN_DIR:-}" ]; then
+		[ -d "$CTWM_SPLEEN_DIR" ] && has_spleen_fonts "$CTWM_SPLEEN_DIR" &&
+			printf '%s\n' "$CTWM_SPLEEN_DIR"
+		return 0
+	fi
+
+	for dir in \
+		/usr/share/fonts/spleen \
+		/usr/local/share/fonts/spleen \
+		/usr/local/share/fonts/Spleen \
+		/usr/local/share/fonts/X11/spleen \
+		/usr/pkg/share/fonts/spleen \
+		/usr/pkg/share/fonts/X11/spleen \
+		/usr/X11R7/lib/X11/fonts/spleen
+	do
+		[ -d "$dir" ] || continue
+		has_spleen_fonts "$dir" || continue
+		printf '%s\n' "$dir"
+		return
+	done
+	return 0
+}
+
+source_dir=$(find_source_dir)
+[ -n "$source_dir" ] || exit 1
 command -v mkfontscale >/dev/null 2>&1 || exit 1
 command -v mkfontdir >/dev/null 2>&1 || exit 1
 command -v xset >/dev/null 2>&1 || exit 1
@@ -14,11 +47,11 @@ command -v xset >/dev/null 2>&1 || exit 1
 mkdir -p "$font_dir"
 find "$font_dir" -maxdepth 1 -type f \
     \( -name 'spleen-*' -o -name 'fonts.alias' -o -name 'fonts.dir' \
-    -o -name 'fonts.scale' \) -delete
-find "$font_dir" -maxdepth 1 -type l -delete
+    -o -name 'fonts.scale' \) -exec rm -f {} +
+find "$font_dir" -maxdepth 1 -type l -exec rm -f {} +
 
 found=false
-for font in "$source_dir"/spleen-*.pcf; do
+for font in "$source_dir"/spleen-*.pcf "$source_dir"/spleen-*.pcf.gz; do
 	[ -f "$font" ] || continue
 	cp "$font" "$font_dir/${font##*/}"
 	found=true
