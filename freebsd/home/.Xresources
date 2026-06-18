@@ -1,0 +1,49 @@
+! Plan 9 Acme-inspired X resources
+! body: #FFFFEA, body-select: #EEEE9E, body-border: #99994C
+! tag:  #EAFFFF, tag-select:  #9EEEEE, tag-border:  #8888CC
+
+XTerm*termName: xterm-256color
+XTerm*locale: true
+XTerm*utf8: 1
+XTerm*faceName: DejaVu Sans Mono
+XTerm*faceSize: 11
+XTerm*foreground: #000000
+XTerm*background: #FFFFEA
+XTerm*cursorColor: #000000
+XTerm*pointerColor: #000000
+XTerm*pointerColorBackground: #FFFFEA
+XTerm*highlightColor: #EEEE9E
+XTerm*highlightTextColor: #000000
+XTerm*internalBorder: 10
+XTerm*scrollBar: false
+XTerm*rightScrollBar: false
+XTerm*saveLines: 10000
+XTerm*selectToClipboard: true
+XTerm*metaSendsEscape: true
+XTerm*bellIsUrgent: true
+
+! A restrained 16-color palette that does not fight Acme's pale body.
+XTerm*color0:  #000000
+XTerm*color1:  #8B0000
+XTerm*color2:  #556B2F
+XTerm*color3:  #99994C
+XTerm*color4:  #00008B
+XTerm*color5:  #8B008B
+XTerm*color6:  #008B8B
+XTerm*color7:  #EAEAEA
+XTerm*color8:  #555555
+XTerm*color9:  #B22222
+XTerm*color10: #6B8E23
+XTerm*color11: #EEEE9E
+XTerm*color12: #8888CC
+XTerm*color13: #9370DB
+XTerm*color14: #9EEEEE
+XTerm*color15: #FFFFFF
+
+XClock*background: #FFFFEA
+XClock*foreground: #000000
+XClock*majorColor: #99994C
+XClock*minorColor: #8888CC
+XClock*hourColor:  #000000
+XClock*minuteColor:#000000
+XClock*secondColor:#8B0000
