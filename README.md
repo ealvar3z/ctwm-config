@@ -93,7 +93,8 @@ Sam, plumber, and rc shell menu entries where the commands are available.
 At startup, `ctwm_font_size` selects a bitmap font size from the primary
 monitor reported by `xrandr`, avoiding multi-monitor scaling mistakes.
 
-`ctwm_font_path` uses Spleen when installed. It searches common Linux, FreeBSD,
+`ctwm_font_path` uses Spleen when installed. It searches common Linux paths,
+including Debian's `fonts-spleen` X11 font directory, plus FreeBSD,
 NetBSD/pkgsrc, and OpenBSD font roots, then builds an indexed font cache under
 `~/.cache/ctwm/fonts/spleen`. Set `CTWM_SPLEEN_DIR` to force a specific source
 directory. When Spleen or X11 font indexing tools are unavailable, the config

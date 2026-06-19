@@ -143,6 +143,9 @@ DecorateTransients
 # allow the user to have their root window recolored as they choose
 DontPaintRootWindow
 
+syscmd(`xsetroot -solid black >/dev/null 2>&1')
+syscmd(`setxkbmap -option ctrl:swapcaps >/dev/null 2>&1')
+
 # hide window contents while altering windows for performance
 NoOpaqueMove
 NoOpaqueResize

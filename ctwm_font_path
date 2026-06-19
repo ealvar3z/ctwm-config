@@ -23,6 +23,7 @@ find_source_dir()
 
 	for dir in \
 		/usr/share/fonts/spleen \
+		/usr/share/fonts/X11/misc \
 		/usr/local/share/fonts/spleen \
 		/usr/local/share/fonts/Spleen \
 		/usr/local/share/fonts/X11/spleen \
